@@ -50,65 +50,23 @@ function monitorRegions () {
         })
     ].forEach(device.regions.startMonitoring);
 
-    var enterActions = {
-        'work': function () {
-            var appName = "calendar";
-            return device.applications.launch(appName, {}, function (error) {
-                if (error) {
-                    return console.error('failed to launch app ' +
-                      appName + ', please verify the application name;' + error);
-                }
-            });
-        },
-        'home': function () {
-            return sendToVictoria('I\'m home');
-        },
-        'fortune': function () {
-            return sendToVictoria('Let me in!');
-        }
-    };
-
-    var exitActions = {
-        'work': function () {
-            return sendToVictoria('I\'m done with work');
-        },
-        'fortune': function () {
-            return sendToVictoria('kthxbai');
-        }
-    };
-
-    device.regions.on('enter', function (signal) {
-        console.log('arrived at ' + signal.name);
-        device.network.wifiEnabled = true;
-        return enterActions[signal.name] && enterActions[signal.name]();
-    });
-
-    device.regions.on('exit', function (signal) {
-        console.log('left ' + signal.name);
-        device.network.wifiEnabled = false;
-        return exitActions[signal.name] && exitActions[signal.name]();
-    });
+    device.regions.on('enter', onEnter);
+    device.regions.on('exit', onExit);
 
     var listener = device.location.createListener('GPS', 5000);
 
-    listener.on('changed', function (signal) {
+    listener.on('changed', function checkInitLocation (signal) {
         listener.stop();
-        device.regions.getAll().forEach(function (region) {
+        device.regions.getAll().forEach(function checkInitRegion (region) {
             if (signal.location.latitude.toFixed(2) === region.latitude.toFixed(2) &&
                 signal.location.longitude.toFixed(2) === region.longitude.toFixed(2)) {
                 console.log('Start location: ' + region.name);
-                console.log(region.emit);
-                try {
-                    region.emit('enter');
-                } catch (error) {
-                    console.error('failed to emit' + error);
-                }
+                onEnter(region);
             }
         });
     });
 
     listener.start();
-
 
     console.log('monitering regions');
 }
@@ -121,7 +79,7 @@ function sendMessage (to, message) {
         if (error) {
             return console.error('Error sending text message: ' + JSON.stringify(error));
         }
-        return console.log('Message: "' + message + '" send to ' + to.name);
+        return console.log('Message: "' + message + '" sent to ' + to.name);
     });
 }
 
@@ -131,4 +89,51 @@ function sendToVictoria (message) {
         number: '+1(408)466-4989'
     };
     return sendMessage(victoria, message);
+}
+
+function onEnter (signal) {
+    var enterActions = {
+        'work': arrivedWork,
+        'home': arrivedHome,
+        'fortune': arrivedFortune
+    };
+    console.log('arrived at ' + signal.name);
+    device.network.wifiEnabled = true;
+    return enterActions[signal.name] && enterActions[signal.name]();
+}
+
+function onExit (signal) {
+    var exitActions = {
+        'work': leftWork,
+        'fortune': leftFortune
+    };
+    console.log('left ' + signal.name);
+    device.network.wifiEnabled = false;
+    return exitActions[signal.name] && exitActions[signal.name]();
+}
+
+function arrivedWork () {
+    var appName = "calendar";
+    return device.applications.launch(appName, {}, function (error) {
+        if (error) {
+            return console.error('failed to launch app ' +
+              appName + ', please verify the application name;' + error);
+        }
+    });
+}
+
+function arrivedHome () {
+    return sendToVictoria('I\'m home');
+}
+
+function arrivedFortune () {
+    return sendToVictoria('Let me in!');
+}
+
+function leftWork () {
+    return sendToVictoria('I\'m done with work');
+}
+
+function leftFortune () {
+    return sendToVictoria('kthxbai');
 }
