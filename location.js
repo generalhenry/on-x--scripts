@@ -1,5 +1,5 @@
 /*global device:true */
-console.log('Started Script:' + device.currentSource);
+console.log('Started Script: ' + device.currentSource);
 
 if (!(device.version && device.version.isSupported(0, 54))) {
 
@@ -12,7 +12,7 @@ if (!(device.version && device.version.isSupported(0, 54))) {
   scanOnCharging();
 }
 
-console.log('Completed Script:' + device.currentSource);
+console.log('Completed Script: ' + device.currentSource);
 
 function scanOnCharging () {
     var listener = device.location.createListener('HYBRID', 5000);
@@ -22,7 +22,7 @@ function scanOnCharging () {
 }
 
 function monitorRegions () {
-
+    
     var regions = [
         device.regions.createRegion({
             latitude: 37.2954177856445,
@@ -49,25 +49,27 @@ function monitorRegions () {
             radius: 500
         })
     ].forEach(device.regions.startMonitoring);
-
+        
     device.regions.on('enter', onEnter);
     device.regions.on('exit', onExit);
-
-    var listener = device.location.createListener('GPS', 5000);
-
-    listener.on('changed', function checkInitLocation (signal) {
+    
+    var listener = device.location.createListener('GPS', 5000); 
+    listener.once('changed', checkInitLocation);
+    listener.start();
+    
+    function checkInitLocation (signal) {
         listener.stop();
-        device.regions.getAll().forEach(function checkInitRegion (region) {
+        return device.regions.getAll().forEach(checkInitRegion);
+        
+        function checkInitRegion (region) {
             if (signal.location.latitude.toFixed(2) === region.latitude.toFixed(2) &&
                 signal.location.longitude.toFixed(2) === region.longitude.toFixed(2)) {
                 console.log('Start location: ' + region.name);
-                onEnter(region);
+                onEnter({name: region.name});
             }
-        });
-    });
-
-    listener.start();
-
+        }
+    }
+    
     console.log('monitering regions');
 }
 
@@ -77,10 +79,11 @@ function sendMessage (to, message) {
         body: message
     }, function (error) {
         if (error) {
-            return console.error('Error sending text message: ' + JSON.stringify(error));
+            console.error('Message fail to send: ' + message);
+            return console.error('Error: ' + JSON.stringify(error));
         }
         return console.log('Message: "' + message + '" sent to ' + to.name);
-    });
+    });   
 }
 
 function sendToVictoria (message) {
@@ -92,22 +95,22 @@ function sendToVictoria (message) {
 }
 
 function onEnter (signal) {
+    console.log('arrived at ' + signal.name);
     var enterActions = {
         'work': arrivedWork,
         'home': arrivedHome,
         'fortune': arrivedFortune
     };
-    console.log('arrived at ' + signal.name);
     device.network.wifiEnabled = true;
     return enterActions[signal.name] && enterActions[signal.name]();
 }
 
 function onExit (signal) {
+    console.log('left ' + signal.name);
     var exitActions = {
         'work': leftWork,
         'fortune': leftFortune
     };
-    console.log('left ' + signal.name);
     device.network.wifiEnabled = false;
     return exitActions[signal.name] && exitActions[signal.name]();
 }
@@ -116,9 +119,10 @@ function arrivedWork () {
     var appName = "calendar";
     return device.applications.launch(appName, {}, function (error) {
         if (error) {
-            return console.error('failed to launch app ' +
+            return console.error('failed to launch app ' + 
               appName + ', please verify the application name;' + error);
         }
+        console.log(appName + ' lauched');
     });
 }
 
